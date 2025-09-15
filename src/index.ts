@@ -10,6 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { promises as fs } from "fs";
 import path from "path";
+import jq from "node-jq";
 
 interface ProcessingResult {
   record_index: number;
@@ -48,6 +49,29 @@ class DatasetProcessor {
       return this.records.length;
     } catch (error) {
       throw new Error(`Failed to load dataset: ${error}`);
+    }
+  }
+
+  async loadJsonDataset(filePath: string, jqExpression: string): Promise<number> {
+    try {
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      const jsonData = JSON.parse(fileContent);
+      
+      // Use jq to extract the array of records
+      const result = await jq.run(jqExpression, jsonData);
+      
+      if (!Array.isArray(result)) {
+        throw new Error(`jq expression must return an array, got: ${typeof result}`);
+      }
+      
+      this.records = result;
+      this.currentIndex = 0;
+      this.currentDataset = filePath;
+      this.processingResults = []; // Clear previous results
+      
+      return this.records.length;
+    } catch (error) {
+      throw new Error(`Failed to load JSON dataset: ${error}`);
     }
   }
 
@@ -189,6 +213,24 @@ class DatasetMCPServer {
             }
           },
           {
+            name: "load_json_dataset",
+            description: "Load a JSON dataset using a jq expression that returns an array of records",
+            inputSchema: {
+              type: "object",
+              properties: {
+                file_path: {
+                  type: "string",
+                  description: "Path to the JSON file"
+                },
+                jq_expression: {
+                  type: "string",
+                  description: "jq expression that returns an array (e.g., '.data[]', '.items', '.[].records')"
+                }
+              },
+              required: ["file_path", "jq_expression"]
+            }
+          },
+          {
             name: "get_next_record",
             description: "Get the next record from the dataset for processing",
             inputSchema: {
@@ -280,6 +322,19 @@ class DatasetMCPServer {
             };
           }
 
+          case "load_json_dataset": {
+            const { file_path, jq_expression } = args as { file_path: string, jq_expression: string };
+            const count = await this.processor.loadJsonDataset(file_path, jq_expression);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Successfully loaded JSON dataset with ${count} records from ${file_path} using jq expression: ${jq_expression}`
+                }
+              ]
+            };
+          }
+
           case "get_next_record": {
             const recordData = this.processor.getNextRecord();
             if (recordData === null) {
@@ -311,7 +366,7 @@ class DatasetMCPServer {
               content: [
                 {
                   type: "text",
-                  text: `Result saved for record ${status.current_record - 1}. Total saved: ${status.completed}`
+                  text: `Result saved for record ${status.current_record}. Processing progress: ${status.completed}/${status.total_records}`
                 }
               ]
             };
