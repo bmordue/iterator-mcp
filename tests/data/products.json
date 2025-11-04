@@ -1,0 +1,27 @@
+{
+  "products": [
+    {"id": 1, "name": "Laptop", "price": 999.99, "category": "electronics", "specs": {"ram": "16GB", "storage": "512GB"}},
+    {"id": 2, "name": "Book", "price": 24.99, "category": "books", "specs": {"pages": 300, "format": "hardcover"}},
+    {"id": 3, "name": "Headphones", "price": 199.99, "category": "electronics", "specs": {"wireless": true, "battery": "30h"}}
+  ],
+  "categories": [
+    {"name": "electronics", "tax_rate": 0.08},
+    {"name": "books", "tax_rate": 0.05},
+    {"name": "clothing", "tax_rate": 0.07}
+  ],
+  "orders": {
+    "2024": {
+      "Q1": [
+        {"id": "O001", "product_id": 1, "quantity": 2, "total": 1999.98},
+        {"id": "O002", "product_id": 3, "quantity": 1, "total": 199.99}
+      ],
+      "Q2": [
+        {"id": "O003", "product_id": 2, "quantity": 5, "total": 124.95}
+      ]
+    }
+  },
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2024-09-16"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "users": [
+    {"id": 1, "name": "Alice Johnson", "email": "alice@example.com", "active": true, "department": "Engineering", "salary": 75000, "join_date": "2023-01-15"},
+    {"id": 2, "name": "Bob Smith", "email": "bob@example.com", "active": false, "department": "Marketing", "salary": 65000, "join_date": "2022-06-10"},
+    {"id": 3, "name": "Charlie Brown", "email": "charlie@example.com", "active": true, "department": "Engineering", "salary": 80000, "join_date": "2023-03-22"},
+    {"id": 4, "name": "Diana Prince", "email": "diana@example.com", "active": true, "department": "Sales", "salary": 70000, "join_date": "2022-11-08"},
+    {"id": 5, "name": "Eve Wilson", "email": "eve@example.com", "active": false, "department": "HR", "salary": 62000, "join_date": "2021-09-03"}
+  ],
+  "projects": [
+    {"id": "P001", "name": "Website Redesign", "status": "active", "team_size": 4, "budget": 50000, "priority": "high"},
+    {"id": "P002", "name": "Mobile App", "status": "planning", "team_size": 6, "budget": 120000, "priority": "medium"},
+    {"id": "P003", "name": "Data Migration", "status": "completed", "team_size": 2, "budget": 30000, "priority": "low"}
+  ],
+  "sales": {
+    "2024": {
+      "Q1": [
+        {"month": "January", "amount": 15000, "client": "TechCorp", "product": "Software License"},
+        {"month": "February", "amount": 22000, "client": "StartupInc", "product": "Consulting"},
+        {"month": "March", "amount": 18500, "client": "Enterprise Ltd", "product": "Support Contract"}
+      ],
+      "Q2": [
+        {"month": "April", "amount": 25000, "client": "BigCorp", "product": "Software License"},
+        {"month": "May", "amount": 31000, "client": "TechCorp", "product": "Premium Support"},
+        {"month": "June", "amount": 19500, "client": "NewClient Co", "product": "Consulting"}
+      ]
+    }
+  },
+  "metadata": {
+    "created": "2024-09-16",
+    "version": "1.0",
+    "description": "Sample dataset for testing Iterator MCP Server with various JSON structures"
+  }
+}
