@@ -515,3 +515,11 @@ Export all processing results to a file.
 6. **Progress Tracking**: Always know where you are in the dataset
 
 This approach combines the power of programmatic dataset iteration with the convenience of a conversational interface.
+
+## Features
+
+1. **No API Keys Required**: The MCP server acts as middleware, and you interact through your regular chat interface
+2. **Stateful Processing**: The server maintains state between requests, tracking your progress
+3. **Flexible Navigation**: You can jump to specific records, reset, or continue where you left off
+4. **Error Recovery**: If something goes wrong, your progress is maintained
+5. **Export Capabilities**: Save your processing results at any time
