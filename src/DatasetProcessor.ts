@@ -49,6 +49,10 @@ export class DatasetProcessor {
       const result = await jq.run(jqExpression, filePath);
       
       // jq.run returns a string, so we need to parse it
+      if (typeof result !== 'string') {
+        throw new Error(`Unexpected result type from jq: ${typeof result}`);
+      }
+      
       const parsed = JSON.parse(result);
       
       if (!Array.isArray(parsed)) {

@@ -1,3 +1,8 @@
 node_modules/
 build/
 logs/
+# Compiled test files
+tests/**/*.js
+tests/**/*.d.ts
+tests/**/*.js.map
+tests/**/*.d.ts.map
