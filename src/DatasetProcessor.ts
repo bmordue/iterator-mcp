@@ -45,10 +45,10 @@ export class DatasetProcessor {
 
   async loadJsonDataset(filePath: string, jqExpression: string): Promise<number> {
     try {
-      // Use jq to extract the array of records
+      // Use jq to extract the array of records from the file
       const result = await jq.run(jqExpression, filePath);
       
-      // jq.run returns a string, so we need to parse it
+      // Validate that jq.run returned a string before parsing
       if (typeof result !== 'string') {
         throw new Error(`Unexpected result type from jq: ${typeof result}`);
       }
