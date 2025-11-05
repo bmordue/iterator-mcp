@@ -46,7 +46,7 @@ export class DatasetProcessor {
         }
       }
       
-      this.resetState(filePath, records);
+      this.resetState(filePath, newRecords);
 
       return this.records.length;
     } catch (error) {
@@ -56,14 +56,13 @@ export class DatasetProcessor {
 
   async loadJsonDataset(filePath: string, jqExpression: string): Promise<number> {
     try {
-      // Pass the file path directly to jq to avoid reading the file into Node's memory.
-      const result = await jq.run(jqExpression, filePath, { output: 'json' });
+      const result = await this.executeJsonQuery(filePath, jqExpression);
 
       if (!Array.isArray(result)) {
         throw new Error(`jq expression must return an array, got: ${typeof result}`);
       }
-      
-      this.resetState(filePath, parsed);
+
+      this.resetState(filePath, result);
       return this.records.length;
     } catch (error) {
       throw new Error(`Failed to load JSON dataset`, { cause: error });
@@ -129,5 +128,137 @@ export class DatasetProcessor {
       return true;
     }
     return false;
+  }
+
+  private async executeJsonQuery(filePath: string, jqExpression: string): Promise<any> {
+    try {
+      // Attempt to use jq when available for full expression support.
+      return await jq.run(jqExpression, filePath, { output: 'json' });
+    } catch (error) {
+      if (this.shouldFallbackToInternalParser(error)) {
+        return this.evaluateExpressionWithFallback(filePath, jqExpression);
+      }
+      throw error;
+    }
+  }
+
+  private shouldFallbackToInternalParser(error: unknown): boolean {
+    if (error && typeof error === 'object' && 'code' in error) {
+      const errno = (error as NodeJS.ErrnoException).code;
+      return errno === 'ENOENT';
+    }
+    return false;
+  }
+
+  private async evaluateExpressionWithFallback(filePath: string, jqExpression: string): Promise<any> {
+    const fileContents = await fs.readFile(filePath, 'utf-8');
+    const jsonData = JSON.parse(fileContents);
+
+    return this.applySimpleExpression(jsonData, jqExpression);
+  }
+
+  private applySimpleExpression(jsonData: any, jqExpression: string): any {
+    const stages = jqExpression.split('|').map(stage => stage.trim()).filter(Boolean);
+    if (stages.length === 0) {
+      throw new Error(`Unsupported jq expression: ${jqExpression}`);
+    }
+
+    const [pathExpression, ...pipeline] = stages;
+
+    if (!pathExpression || !pathExpression.startsWith('.')) {
+      throw new Error(`Unsupported jq expression: ${jqExpression}`);
+    }
+
+    let result = this.resolveJsonPath(jsonData, pathExpression);
+
+    for (const stage of pipeline) {
+      result = this.applyPipelineStage(result, stage);
+    }
+
+    return result;
+  }
+
+  private resolveJsonPath(jsonData: any, pathExpression: string): any {
+    const trimmed = pathExpression.trim();
+    if (trimmed === '.') {
+      return jsonData;
+    }
+
+    const rawSegments = trimmed.slice(1).split('.').filter(segment => segment.length > 0);
+    const segments = rawSegments.map(segment => {
+      const segmentTrimmed = segment.trim();
+      if (segmentTrimmed.startsWith('"') && segmentTrimmed.endsWith('"')) {
+        return segmentTrimmed.slice(1, -1);
+      }
+      return segmentTrimmed;
+    });
+
+    let current: any = jsonData;
+    for (const segment of segments) {
+      if (current === null || current === undefined || !(segment in current)) {
+        throw new Error(`Path segment '${segment}' not found in JSON data`);
+      }
+      current = current[segment];
+    }
+
+    return current;
+  }
+
+  private applyPipelineStage(currentValue: any, stage: string): any {
+    if (stage.startsWith('map(') && stage.endsWith(')')) {
+      if (!Array.isArray(currentValue)) {
+        throw new Error(`map/select stage requires an array input`);
+      }
+
+      const inner = stage.slice(4, -1).trim();
+      if (!(inner.startsWith('select(') && inner.endsWith(')'))) {
+        throw new Error(`Unsupported jq stage: ${stage}`);
+      }
+
+      const condition = inner.slice(7, -1).trim();
+      return currentValue.filter(item => this.evaluateSelectCondition(item, condition));
+    }
+
+    throw new Error(`Unsupported jq stage: ${stage}`);
+  }
+
+  private evaluateSelectCondition(item: any, condition: string): boolean {
+    const equalityMatch = condition.match(/^\.([A-Za-z0-9_]+)\s*==\s*(.+)$/);
+    if (!equalityMatch) {
+      throw new Error(`Unsupported jq select condition: ${condition}`);
+    }
+
+    const field = equalityMatch[1];
+    const expectedRaw = equalityMatch[2];
+
+    if (!field || expectedRaw === undefined) {
+      throw new Error(`Unsupported jq select condition: ${condition}`);
+    }
+
+    const expectedValue = this.parseLiteral(expectedRaw.trim());
+
+    return item?.[field] === expectedValue;
+  }
+
+  private parseLiteral(rawValue: string): any {
+    if (rawValue === 'true') {
+      return true;
+    }
+    if (rawValue === 'false') {
+      return false;
+    }
+    if (rawValue === 'null') {
+      return null;
+    }
+    if (rawValue.startsWith('"') && rawValue.endsWith('"')) {
+      return rawValue.slice(1, -1);
+    }
+
+    const maybeNumber = Number(rawValue);
+    if (!Number.isNaN(maybeNumber)) {
+      return maybeNumber;
+    }
+
+    throw new Error(`Unsupported literal value: ${rawValue}`);
   }
 }
