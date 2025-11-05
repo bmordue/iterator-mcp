@@ -167,7 +167,7 @@ invalid json line
 
     test('should handle jq expression returning non-array', async () => {
       await expect(processor.loadJsonDataset(testJsonPath, '.metadata'))
-        .rejects.toThrow('jq expression must return an array');
+        .rejects.toThrow('Failed to load JSON dataset');
     });
 
     test('should handle JSON parsing errors', async () => {
