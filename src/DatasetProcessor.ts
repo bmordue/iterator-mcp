@@ -20,6 +20,13 @@ export class DatasetProcessor {
   private records: any[] = [];
   private processingResults: ProcessingResult[] = [];
 
+  private resetState(filePath: string, records: any[]) {
+    this.records = records;
+    this.currentIndex = 0;
+    this.currentDataset = filePath;
+    this.processingResults = [];
+  }
+
   async loadDataset(filePath: string): Promise<number> {
     try {
       const fileStream = createReadStream(filePath);
@@ -38,11 +45,8 @@ export class DatasetProcessor {
           }
         }
       }
-
-      this.records = newRecords;
-      this.currentIndex = 0;
-      this.currentDataset = filePath;
-      this.processingResults = []; // Clear previous results
+      
+      this.resetState(filePath, records);
 
       return this.records.length;
     } catch (error) {
@@ -52,28 +56,17 @@ export class DatasetProcessor {
 
   async loadJsonDataset(filePath: string, jqExpression: string): Promise<number> {
     try {
-      // Use jq to extract the array of records from the file
-      const result = await jq.run(jqExpression, filePath);
-      
-      // Validate that jq.run returned a string before parsing
-      if (typeof result !== 'string') {
-        throw new Error(`Unexpected result type from jq: ${typeof result}`);
+      // Pass the file path directly to jq to avoid reading the file into Node's memory.
+      const result = await jq.run(jqExpression, filePath, { output: 'json' });
+
+      if (!Array.isArray(result)) {
+        throw new Error(`jq expression must return an array, got: ${typeof result}`);
       }
       
-      const parsed = JSON.parse(result);
-      
-      if (!Array.isArray(parsed)) {
-        throw new Error(`jq expression must return an array, got: ${typeof parsed}`);
-      }
-      
-      this.records = parsed;
-      this.currentIndex = 0;
-      this.currentDataset = filePath;
-      this.processingResults = []; // Clear previous results
-      
+      this.resetState(filePath, parsed);
       return this.records.length;
     } catch (error) {
-      throw new Error(`Failed to load JSON dataset from '${filePath}'`, { cause: error });
+      throw new Error(`Failed to load JSON dataset`, { cause: error });
     }
   }
 
