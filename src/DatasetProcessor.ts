@@ -1,4 +1,5 @@
-import { promises as fs } from "fs";
+import { promises as fs, createReadStream } from "fs";
+import { createInterface } from "readline";
 import jq from "node-jq";
 
 export interface ProcessingResult {
@@ -21,22 +22,28 @@ export class DatasetProcessor {
 
   async loadDataset(filePath: string): Promise<number> {
     try {
-      const fileContent = await fs.readFile(filePath, 'utf-8');
-      const lines = fileContent.split('\n').filter((line: string) => line.trim());
-      
-      this.records = [];
-      for (const line of lines) {
-        try {
-          this.records.push(JSON.parse(line));
-        } catch (parseError) {
-          console.warn(`Skipping invalid JSON line: ${line}`);
+      const fileStream = createReadStream(filePath);
+      const rl = createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      const newRecords = [];
+      for await (const line of rl) {
+        if (line.trim()) {
+          try {
+            newRecords.push(JSON.parse(line));
+          } catch (parseError) {
+            console.warn(`Skipping invalid JSON line: ${line}`);
+          }
         }
       }
-      
+
+      this.records = newRecords;
       this.currentIndex = 0;
       this.currentDataset = filePath;
       this.processingResults = []; // Clear previous results
-      
+
       return this.records.length;
     } catch (error) {
       throw new Error(`Failed to load dataset from '${filePath}'`, { cause: error });
