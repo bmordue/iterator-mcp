@@ -1,14 +1,11 @@
+import { jest, describe, test, beforeEach, afterEach, expect } from '@jest/globals';
 import { DatasetProcessor } from '../src/DatasetProcessor.js';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Mock jq module to avoid dependency issues in tests
-jest.mock('node-jq', () => ({
-  run: jest.fn()
-}));
-
-import jq from 'node-jq';
-const mockJq = jq as jest.Mocked<typeof jq>;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('DatasetProcessor', () => {
   let processor: DatasetProcessor;
@@ -16,7 +13,6 @@ describe('DatasetProcessor', () => {
 
   beforeEach(() => {
     processor = new DatasetProcessor();
-    jest.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -124,71 +120,35 @@ invalid json line
     const testJsonPath = path.join(testDataDir, 'test_data.json');
     const productsJsonPath = path.join(testDataDir, 'products.json');
 
-    beforeEach(() => {
-      // Reset mock before each test
-      mockJq.run.mockReset();
-    });
-
     test('should load JSON dataset with simple array extraction', async () => {
-      const mockResult = [
-        {"id": 1, "name": "Alice Johnson", "department": "Engineering"},
-        {"id": 2, "name": "Bob Smith", "department": "Marketing"}
-      ];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-
       const count = await processor.loadJsonDataset(testJsonPath, '.users');
       
-      expect(count).toBe(2);
-      expect(mockJq.run).toHaveBeenCalledWith('.users', expect.any(Object));
+      expect(count).toBe(5); // test_data.json has 5 users
       
       const status = processor.getProcessingStatus();
-      expect(status.total_records).toBe(2);
+      expect(status.total_records).toBe(5);
       expect(status.dataset).toBe(testJsonPath);
     });
 
     test('should handle filtered JSON dataset loading', async () => {
-      const mockResult = [
-        {"id": 1, "name": "Alice", "active": true},
-        {"id": 3, "name": "Charlie", "active": true}
-      ];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-
       const count = await processor.loadJsonDataset(
         testJsonPath, 
         '.users | map(select(.active == true))'
       );
       
-      expect(count).toBe(2);
-      expect(mockJq.run).toHaveBeenCalledWith(
-        '.users | map(select(.active == true))',
-        expect.any(Object)
-      );
+      expect(count).toBe(3); // 3 active users in test_data.json
     });
 
     test('should handle nested JSON data extraction', async () => {
-      const mockResult = [
-        {"id": "O001", "product_id": 1, "quantity": 2},
-        {"id": "O002", "product_id": 3, "quantity": 1}
-      ];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-
       const count = await processor.loadJsonDataset(
         productsJsonPath,
         '.orders."2024".Q1'
       );
       
-      expect(count).toBe(2);
-      expect(mockJq.run).toHaveBeenCalledWith('.orders."2024".Q1', expect.any(Object));
+      expect(count).toBe(2); // 2 orders in Q1
     });
 
     test('should iterate through JSON records correctly', async () => {
-      const mockResult = [
-        {"id": 1, "name": "Laptop", "price": 999.99},
-        {"id": 2, "name": "Book", "price": 24.99},
-        {"id": 3, "name": "Headphones", "price": 199.99}
-      ];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-
       await processor.loadJsonDataset(productsJsonPath, '.products');
       
       const firstRecord = processor.getNextRecord();
@@ -206,8 +166,6 @@ invalid json line
     });
 
     test('should handle jq expression returning non-array', async () => {
-      mockJq.run.mockResolvedValueOnce({"not": "an array"});
-
       await expect(processor.loadJsonDataset(testJsonPath, '.metadata'))
         .rejects.toThrow('jq expression must return an array');
     });
@@ -220,8 +178,6 @@ invalid json line
     });
 
     test('should handle jq execution errors', async () => {
-      mockJq.run.mockRejectedValueOnce(new Error('Invalid jq expression'));
-
       await expect(processor.loadJsonDataset(testJsonPath, 'invalid_jq'))
         .rejects.toThrow('Failed to load JSON dataset');
     });
@@ -229,15 +185,8 @@ invalid json line
 
   describe('Dataset Navigation and Control', () => {
     beforeEach(async () => {
-      const mockResult = [
-        {"id": 1, "name": "Item 1"},
-        {"id": 2, "name": "Item 2"},
-        {"id": 3, "name": "Item 3"},
-        {"id": 4, "name": "Item 4"},
-        {"id": 5, "name": "Item 5"}
-      ];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-      await processor.loadJsonDataset('test.json', '.items');
+      // Load real JSON data with 5 items
+      await processor.loadJsonDataset(path.join(testDataDir, 'test_data.json'), '.users');
     });
 
     test('should reset to start correctly', async () => {
@@ -257,7 +206,7 @@ invalid json line
       // Should get first record again
       const record = processor.getNextRecord();
       expect(record!.record_number).toBe(1);
-      expect(record!.record.name).toBe('Item 1');
+      expect(record!.record.name).toBe('Alice Johnson');
     });
 
     test('should jump to specific record correctly', async () => {
@@ -267,7 +216,7 @@ invalid json line
       
       const record = processor.getNextRecord();
       expect(record!.record_number).toBe(3);
-      expect(record!.record.name).toBe('Item 3');
+      expect(record!.record.name).toBe('Charlie Brown');
     });
 
     test('should handle invalid jump indices', async () => {
@@ -295,23 +244,18 @@ invalid json line
 
   describe('Result Processing and Export', () => {
     beforeEach(async () => {
-      const mockResult = [
-        {"id": 1, "name": "Task 1"},
-        {"id": 2, "name": "Task 2"},
-        {"id": 3, "name": "Task 3"}
-      ];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-      await processor.loadJsonDataset('test.json', '.tasks');
+      // Load real data with 3 products
+      await processor.loadJsonDataset(path.join(testDataDir, 'products.json'), '.products');
     });
 
     test('should save processing results correctly', async () => {
       // Process first record and save result
       const record1 = processor.getNextRecord();
-      processor.saveResult('Processed Task 1 - High Priority');
+      processor.saveResult('Processed Laptop - High Priority');
       
       // Process second record and save result
       const record2 = processor.getNextRecord();
-      processor.saveResult('Processed Task 2 - Medium Priority');
+      processor.saveResult('Processed Book - Medium Priority');
       
       const status = processor.getProcessingStatus();
       expect(status.completed).toBe(2);
@@ -362,9 +306,7 @@ invalid json line
       expect(processor.getProcessingStatus().completed).toBe(1);
       
       // Load new dataset
-      const newMockResult = [{"id": 1, "data": "new"}];
-      mockJq.run.mockResolvedValueOnce(newMockResult);
-      await processor.loadJsonDataset('new.json', '.data');
+      await processor.loadJsonDataset(path.join(testDataDir, 'test_data.json'), '.users');
       
       // Results should be cleared
       expect(processor.getProcessingStatus().completed).toBe(0);
@@ -383,14 +325,12 @@ invalid json line
     });
 
     test('should track progress accurately during processing', async () => {
-      const mockResult = [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}];
-      mockJq.run.mockResolvedValueOnce(mockResult);
-      await processor.loadJsonDataset('test.json', '.items');
+      await processor.loadJsonDataset(path.join(testDataDir, 'products.json'), '.products');
       
       // Initial status
       let status = processor.getProcessingStatus();
       expect(status.current_record).toBe(0);
-      expect(status.remaining).toBe(4);
+      expect(status.remaining).toBe(3); // 3 products
       expect(status.completed).toBe(0);
       
       // After processing 2 records with 1 result saved
@@ -400,16 +340,15 @@ invalid json line
       
       status = processor.getProcessingStatus();
       expect(status.current_record).toBe(2);
-      expect(status.remaining).toBe(2);
+      expect(status.remaining).toBe(1);
       expect(status.completed).toBe(1);
       
       // After completing all records with 2 results saved
       processor.getNextRecord();
       processor.saveResult('Result 3');
-      processor.getNextRecord();
       
       status = processor.getProcessingStatus();
-      expect(status.current_record).toBe(4);
+      expect(status.current_record).toBe(3);
       expect(status.remaining).toBe(0);
       expect(status.completed).toBe(2);
     });
