@@ -66,7 +66,7 @@ export class DatasetProcessor {
       
       return this.records.length;
     } catch (error) {
-      throw new Error(`Failed to load JSON dataset: ${error}`);
+      throw new Error(`Failed to load JSON dataset from '${filePath}'`, { cause: error });
     }
   }
 
