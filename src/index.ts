@@ -8,110 +8,7 @@ import {
   McpError,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { promises as fs } from "fs";
-import path from "path";
-
-interface ProcessingResult {
-  record_index: number;
-  result: string;
-}
-
-interface RecordData {
-  record_number: number;
-  total_records: number;
-  record: any;
-  progress: string;
-}
-
-class DatasetProcessor {
-  private currentDataset: string | null = null;
-  private currentIndex: number = 0;
-  private records: any[] = [];
-  private processingResults: ProcessingResult[] = [];
-
-  async loadDataset(filePath: string): Promise<number> {
-    try {
-      const fileContent = await fs.readFile(filePath, 'utf-8');
-      const lines = fileContent.split('\n').filter((line: string) => line.trim());
-      
-      this.records = [];
-      for (const line of lines) {
-        try {
-          this.records.push(JSON.parse(line));
-        } catch (parseError) {
-          console.warn(`Skipping invalid JSON line: ${line}`);
-        }
-      }
-      
-      this.currentIndex = 0;
-      this.currentDataset = filePath;
-      return this.records.length;
-    } catch (error) {
-      throw new Error(`Failed to load dataset: ${error}`);
-    }
-  }
-
-  getNextRecord(): RecordData | null {
-    if (this.currentIndex >= this.records.length) {
-      return null;
-    }
-
-    const record = this.records[this.currentIndex];
-    this.currentIndex += 1;
-    
-    return {
-      record_number: this.currentIndex,
-      total_records: this.records.length,
-      record: record,
-      progress: `${this.currentIndex}/${this.records.length}`
-    };
-  }
-
-  saveResult(result: string): void {
-    this.processingResults.push({
-      record_index: this.currentIndex - 1,
-      result: result
-    });
-  }
-
-  getProcessingStatus() {
-    return {
-      dataset: this.currentDataset,
-      current_record: this.currentIndex,
-      total_records: this.records.length,
-      completed: this.processingResults.length,
-      remaining: this.records.length - this.currentIndex
-    };
-  }
-
-  async exportResults(outputPath: string): Promise<void> {
-    try {
-      await fs.writeFile(
-        outputPath, 
-        JSON.stringify(this.processingResults, null, 2)
-      );
-    } catch (error) {
-      throw new Error(`Failed to export results: ${error}`);
-    }
-  }
-
-  // Additional utility methods
-  hasMoreRecords(): boolean {
-    return this.currentIndex < this.records.length;
-  }
-
-  resetToStart(): void {
-    this.currentIndex = 0;
-  }
-
-  jumpToRecord(index: number): boolean {
-    if (index >= 0 && index < this.records.length) {
-      this.currentIndex = index;
-      return true;
-    }
-    return false;
-  }
-}
+import { DatasetProcessor } from "./DatasetProcessor.js";
 
 class DatasetMCPServer {
   private server: Server;
@@ -186,6 +83,24 @@ class DatasetMCPServer {
                 }
               },
               required: ["file_path"]
+            }
+          },
+          {
+            name: "load_json_dataset",
+            description: "Load a JSON dataset using a jq expression that returns an array of records",
+            inputSchema: {
+              type: "object",
+              properties: {
+                file_path: {
+                  type: "string",
+                  description: "Path to the JSON file"
+                },
+                jq_expression: {
+                  type: "string",
+                  description: "jq expression that returns an array (e.g., '.data[]', '.items', '.[].records')"
+                }
+              },
+              required: ["file_path", "jq_expression"]
             }
           },
           {
@@ -280,6 +195,19 @@ class DatasetMCPServer {
             };
           }
 
+          case "load_json_dataset": {
+            const { file_path, jq_expression } = args as { file_path: string, jq_expression: string };
+            const count = await this.processor.loadJsonDataset(file_path, jq_expression);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Successfully loaded JSON dataset with ${count} records from ${file_path} using jq expression: ${jq_expression}`
+                }
+              ]
+            };
+          }
+
           case "get_next_record": {
             const recordData = this.processor.getNextRecord();
             if (recordData === null) {
@@ -311,7 +239,7 @@ class DatasetMCPServer {
               content: [
                 {
                   type: "text",
-                  text: `Result saved for record ${status.current_record - 1}. Total saved: ${status.completed}`
+                  text: `Result saved for record ${status.current_record - 1}. Processing progress: ${status.completed}/${status.total_records}`
                 }
               ]
             };
