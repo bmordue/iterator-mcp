@@ -239,7 +239,7 @@ class DatasetMCPServer {
               content: [
                 {
                   type: "text",
-                  text: `Result saved for record ${status.current_record}. Processing progress: ${status.completed}/${status.total_records}`
+                  text: `Result saved for record ${status.current_record - 1}. Processing progress: ${status.completed}/${status.total_records}`
                 }
               ]
             };
