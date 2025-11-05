@@ -19,23 +19,28 @@ export class DatasetProcessor {
   private records: any[] = [];
   private processingResults: ProcessingResult[] = [];
 
+  private resetState(filePath: string, records: any[]) {
+    this.records = records;
+    this.currentIndex = 0;
+    this.currentDataset = filePath;
+    this.processingResults = [];
+  }
+
   async loadDataset(filePath: string): Promise<number> {
     try {
       const fileContent = await fs.readFile(filePath, 'utf-8');
       const lines = fileContent.split('\n').filter((line: string) => line.trim());
       
-      this.records = [];
+      const records = [];
       for (const line of lines) {
         try {
-          this.records.push(JSON.parse(line));
+          records.push(JSON.parse(line));
         } catch (parseError) {
           console.warn(`Skipping invalid JSON line: ${line}`);
         }
       }
       
-      this.currentIndex = 0;
-      this.currentDataset = filePath;
-      this.processingResults = []; // Clear previous results
+      this.resetState(filePath, records);
       
       return this.records.length;
     } catch (error) {
@@ -51,12 +56,8 @@ export class DatasetProcessor {
       if (!Array.isArray(result)) {
         throw new Error(`jq expression must return an array, got: ${typeof result}`);
       }
-
-      this.records = result;
-      this.currentIndex = 0;
-      this.currentDataset = filePath;
-      this.processingResults = []; // Clear previous results
-
+      
+      this.resetState(filePath, parsed);
       return this.records.length;
     } catch (error) {
       throw new Error(`Failed to load JSON dataset`, { cause: error });
