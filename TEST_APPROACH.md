@@ -237,7 +237,7 @@ We will employ a **risk-based testing approach** prioritizing:
 ### 7.1 Test Automation Tools
 - **Unit Testing**: Jest or Mocha with Chai
 - **Code Coverage**: Istanbul/nyc
-- **Mocking**: Sinon.js for file system operations
+- **Mocking**: Sinon.js (preferred for advanced file system stubbing; Jest's built-in mocking may be used for consistency in Jest-based tests. Use Sinon.js when more granular control or legacy compatibility is required.)
 - **Type Checking**: TypeScript compiler (tsc)
 - **Linting**: ESLint with TypeScript support
 
@@ -425,6 +425,7 @@ We will employ a **risk-based testing approach** prioritizing:
 
 ### 14.2 Data Storage
 - **Location**: `/test/fixtures/` directory
+  - *Note: If this directory does not exist in the project structure, it should be created.*
 - **Version Control**: Committed to Git repository
 - **Format**: JSONL files with descriptive names
 - **Documentation**: README in fixtures directory
